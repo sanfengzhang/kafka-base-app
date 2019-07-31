@@ -142,11 +142,13 @@ public class ConsumerTask extends Thread {
                 recordFunction.handleRecords(records);
             } catch (AppException e) {
                 //任务不可恢复的异常错误、那就保存任务状态后直接kill掉任务
+                //1.比如可能第三方sink有问题了，数据不能持久化，那么就暂停消费，并且执行Offset提交保存状态
+                //2.任务执行过程中其他不可恢复异常、直接保存状态、退出任务
+                //3.用户自定义异常暂停消费保存状态还是忽略异常
                 if (e instanceof NonRecoverException) {
 
                 }
                 //忽略异常任务继续执行
-
             }
             if (autoCommit) {//只支持同步提交、异步提交数据一致性难以保障
                 this.commitCallback.onSuccess(consumer);
@@ -225,9 +227,6 @@ public class ConsumerTask extends Thread {
                     consumerTmp.seekToEnd(collection);
                     newPartitionState.setOffset(consumerTmp.position(topicPartition) - 1);
                 } else if (newPartitionState.getOffset() == KafkaTopicPartitionStateSentinel.GROUP_OFFSET) {
-                    // the KafkaConsumer by default will automatically seek the consumer position
-                    // to the committed group offset, so we do not need to do it.
-
                     newPartitionState.setOffset(consumerTmp.position(topicPartition) - 1);
                 } else {
                     consumerTmp.seek(topicPartition, newPartitionState.getOffset() + 1);
