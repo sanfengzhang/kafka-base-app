@@ -31,6 +31,11 @@ public class DefaultJobConsumer extends JobConsumer {
         this(jobName, kafkaProperties, useFunction, topics, 1, null);
     }
 
+    public DefaultJobConsumer(String jobName, Properties kafkaProperties, Class<RecordFunction> useFunction, List<Map<String, List<PartitionOffset>>> topicPartitionOffsets) {
+
+        this(jobName, kafkaProperties, useFunction, null, 1, topicPartitionOffsets);
+    }
+
     public DefaultJobConsumer(String jobName, Properties kafkaProperties, Class<RecordFunction> useFunction, Set<String> topics, int numberOfConsumer, List<Map<String, List<PartitionOffset>>> topicPartitionOffsets) {
         this.jobName = jobName;
         if (0 == numberOfConsumer) {
@@ -85,7 +90,7 @@ public class DefaultJobConsumer extends JobConsumer {
             return;
         }
 
-        throw new UnsupportedOperationException("The number of consumers who do not support multiple themes has increased");
+        throw new UnsupportedOperationException("The number of consumers who do not support multiple topic has increased");
     }
 
     @Override

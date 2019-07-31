@@ -1,5 +1,7 @@
 package com.han.kafka.consumer.v2;
 
+import com.han.kafka.consumer.Utils.AppException;
+import com.han.kafka.consumer.Utils.NonRecoverException;
 import com.han.kafka.consumer.support.PartitionOffset;
 import com.han.kafka.common.CommitCallback;
 import com.han.kafka.common.FlowRateLimiter;
@@ -76,11 +78,11 @@ public class ConsumerTask extends Thread {
     private Set<String> topics;
 
 
-    public ConsumerTask(String threadName, Properties kafkaProperties,Set<String> topics,  Long pollTimeout, Class<RecordFunction> functionClass,
+    public ConsumerTask(String threadName, Properties kafkaProperties, Set<String> topics, Long pollTimeout, Class<RecordFunction> functionClass,
                         Map<String, List<PartitionOffset>> topicPartitionOffsets) {
         super(threadName);
         this.kafkaProperties = kafkaProperties;
-        this.topics=topics;
+        this.topics = topics;
         this.pollTimeout = pollTimeout;
         this.consumerReassignmentLock = new Object();
         this.topicPartitionOffsets = topicPartitionOffsets;
@@ -111,37 +113,46 @@ public class ConsumerTask extends Thread {
             log.error("create consumer failed", t);
         }
 
-        try {
-            while (running) {
-                if (shouldPaus) {
+
+        while (running) {
+            if (shouldPaus) {
+                try {
                     pauseLock.lockInterruptibly();
                     pauseLockCondition.await();
                     pauseLock.unlock();
-                }
-                //先获取是否有更改Kafka消费配置事件
-                if (consumerEventQueue.size() > 0) {
-                    try {
-                        ConsumerConfigChangeEvent event = (ConsumerConfigChangeEvent) consumerEventQueue.poll(10, TimeUnit.NANOSECONDS);
-                        reassignPartition(event.getTopicPartitionOffsets());
-                    } catch (InterruptedException e) {
-                        log.warn("reassignPartition failed:" + e);
-                    }
-                }
-
-                //从kafka获取记录
-                records = getRecordsFromKafka();
-
-                //FIXME 这里可以将consume poll线程和业务逻辑线程进行分离?
-                recordFunction.handleRecords(records);
-                if (autoCommit) {//只支持同步提交、异步提交数据一致性难以保障
-
-                    this.commitCallback.onSuccess(consumer);
+                } catch (InterruptedException e) {
+                    log.error("Pause Lock Failed", e);
                 }
             }
-        } catch (Throwable t) {
+            //先获取是否有更改Kafka消费配置事件
+            if (consumerEventQueue.size() > 0) {
+                try {
+                    ConsumerConfigChangeEvent event = (ConsumerConfigChangeEvent) consumerEventQueue.poll(10, TimeUnit.NANOSECONDS);
+                    reassignPartition(event.getTopicPartitionOffsets());
+                } catch (InterruptedException e) {
+                    log.warn("reassignPartition failed:" + e);
+                }
+            }
 
-            log.error("failed", t);
+            //从kafka获取记录
+            records = getRecordsFromKafka();
+
+            //FIXME 这里可以将consume poll线程和业务逻辑线程进行分离?
+            try {
+                recordFunction.handleRecords(records);
+            } catch (AppException e) {
+                //任务不可恢复的异常错误、那就保存任务状态后直接kill掉任务
+                if (e instanceof NonRecoverException) {
+
+                }
+                //忽略异常任务继续执行
+
+            }
+            if (autoCommit) {//只支持同步提交、异步提交数据一致性难以保障
+                this.commitCallback.onSuccess(consumer);
+            }
         }
+
     }
 
     public synchronized String pauseConsumer() {

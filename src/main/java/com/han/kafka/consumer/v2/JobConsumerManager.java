@@ -1,5 +1,8 @@
 package com.han.kafka.consumer.v2;
 
+import com.han.kafka.consumer.support.PartitionOffset;
+
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -16,6 +19,11 @@ public class JobConsumerManager<T> {
 
     public  void  creatJobConsumer(String jobName, Properties kafkaProperties, Class<RecordFunction> useFunction, Set<String> topics) {
         JobConsumer jobConsumer = new DefaultJobConsumer(jobName, kafkaProperties, useFunction, topics);
+        consumerMap.put(jobName, jobConsumer);
+    }
+
+    public  void  creatJobConsumer(String jobName, Properties kafkaProperties, Class<RecordFunction> useFunction, List<Map<String, List<PartitionOffset>>> topicPartitionOffsets) {
+        JobConsumer jobConsumer = new DefaultJobConsumer(jobName, kafkaProperties, useFunction, topicPartitionOffsets);
         consumerMap.put(jobName, jobConsumer);
     }
 
