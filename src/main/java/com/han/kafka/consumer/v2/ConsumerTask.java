@@ -153,6 +153,7 @@ public class ConsumerTask extends Thread {
             if (autoCommit) {//只支持同步提交、异步提交数据一致性难以保障
                 this.commitCallback.onSuccess(consumer);
             }
+
         }
 
     }
